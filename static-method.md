@@ -1631,4 +1631,5 @@ C++の実装はこれまでのどれとも違う感じです。実質的に、C+
 
 # ソース
 
+[全てのソースをgithubにアップしてあります。](https://github.com/omochi/qiita-static-method)
 
