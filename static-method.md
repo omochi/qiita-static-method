@@ -1652,7 +1652,7 @@ C++の実装はこれまでのどれとも違う感じです。実質的に、C+
 
 # 改訂履歴
 
-- 2017/03/01: [norio_nomuraさん](norio_nomura)のツッコミを受けて改訂。swiftにおいて、loadArrayを定義する例を、loadの返り値型オーバーロードに変更。
+- 2017/03/01: [norio_nomuraさん](http://qiita.com/norio_nomura)のツッコミを受けて改訂。swiftにおいて、loadArrayを定義する例を、loadの返り値型オーバーロードに変更。
 - 2017/02/27: [heqateさん](http://qiita.com/heqate)のツッコミを受けて改訂。kotlinにおいて、具象化された型ごとのジェネリッククラスへのextensionメソッド実装による実装方式について追記。
 - 2017/02/24: 投稿
 
