@@ -50,15 +50,15 @@ func load<T: Loadable>(iterator: AnyIterator<String>) -> T
 	return T.load(iterator: iterator)
 }
 
-func loadArray<T: Loadable>(string: String) -> [T] 
+func load<T: Loadable>(string: String) -> [T] 
 	where T.Loaded == T 
 {
 	let tokens = string.components(separatedBy: "/")
 	let iterator = AnyIterator<String>(tokens.makeIterator())
-	return loadArray(iterator: iterator)
+	return load(iterator: iterator)
 }
 
-func loadArray<T: Loadable>(iterator: AnyIterator<String>) -> [T] 
+func load<T: Loadable>(iterator: AnyIterator<String>) -> [T] 
 	where T.Loaded == T 
 {
 	return Array<T>.load(iterator: iterator)
@@ -104,7 +104,7 @@ extension Company: Loadable {
 	static func load(iterator: AnyIterator<String>) -> Company {
 		return Company(
 			name: Main.load(iterator: iterator),
-			employees: Main.loadArray(iterator: iterator))
+			employees: Main.load(iterator: iterator))
 	}
 }
 
@@ -117,7 +117,7 @@ func main() {
 	let s: String = load(string: "abc")
 	print(s)
 
-	let a: [String] = loadArray(string: "3/apple/banana/cherry")
+	let a: [String] = load(string: "3/apple/banana/cherry")
 	print(a)
 
 	let c: Company = load(string: "CatWorld/3/tama/5/mike/6/kuro/7")

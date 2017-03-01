@@ -1,7 +1,3 @@
-# Swiftの強力な機能であるstaticメソッド制約の紹介と、Kotlin, TypeScript, Java, Scala, C++との比較
-
-
-
 # 先に結論
 
 - Swiftのstaticメソッド制約はちょっとしたシンプルな機能に見えるけど便利で深い
@@ -16,7 +12,7 @@
 
 # 導入
 
-Swiftはprotocolという機能で、Javaのinterfaceのように型がインスタンスメソッドをもつ事を強制する事ができます。そしてSwiftではそのメソッド制約として、インスタンスメソッドだけではなくスタティックメソッドをもつ事を矯正する事ができます。[このstaticメソッドを強制する機能に公式な名前はありませんが](https://developer.apple.com/library/prerelease/content/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html#//apple_ref/doc/uid/TP40014097-CH25-ID267)、この記事ではこれを「staticメソッド制約」と呼ぶことにします。理論的にはHaskellにおける型クラスのようなものであり新しいものではありませんが、クラスベースのデザインをベースにこれを取り込んだSwiftの仕様はなかなか強力であると僕は考えています。
+Swiftはprotocolという機能で、Javaのinterfaceのように型がインスタンスメソッドをもつ事を強制する事ができます。そしてSwiftではそのメソッド制約として、インスタンスメソッドだけではなくスタティックメソッドをもつ事を強制する事ができます。[このstaticメソッドを強制する機能に公式な名前はありませんが](https://developer.apple.com/library/prerelease/content/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html#//apple_ref/doc/uid/TP40014097-CH25-ID267)、この記事ではこれを「staticメソッド制約」と呼ぶことにします。理論的にはHaskellにおける型クラスのようなものであり新しいものではありませんが、クラスベースのデザインをベースにこれを取り込んだSwiftの仕様はなかなか強力であると僕は考えています。
 
 この記事では、架空の要件を考えた上で、それをstaticメソッド制約を活用して実装する例を示します。そして、同等のコードをその他の言語でも似たような形で実装することで、何が起こっているどういう機能なのかをわかりやすくします。
 
@@ -206,7 +202,9 @@ extension Array where Element: Loadable {
 }
 ```
 
-ここで、staticメソッドの `load` と、トップレベルの `load` を区別するため、トップレベルのものを `Main.load` として呼び出しています。そのためにコンパイラにソースコードのモジュール名として `Main` を指定しています。
+これで、要素の型が `Loadable` であるときのみ、 `Array.load` メソッドが定義されます。残念ながら `Array` 自体は `Loadable` になっていないので、単にメソッドが定義されるだけです。そのため、既に定義した `Main.load` から `Array` をデコードさせることはできません。
+
+メソッド本体の実装について述べます。staticメソッドの `load` と、トップレベルの `load` を区別するため、トップレベルのものを `Main.load` として呼び出しています。そのためにコンパイラにソースコードのモジュール名として `Main` を指定しています。
 
 ```
 $ swift -module-name Main swift.swift
@@ -214,28 +212,30 @@ $ swift -module-name Main swift.swift
 
 デコード方式としては、はじめに整数をデコードしてこれが要素数となり、その要素数の数だけ要素をデコードしています。要素数のデコードにおいては、先程のテストと同様に左辺値での型指定により `Int` をデコードさせます。要素のデコードにおいては、 `ret.append()` の引数の型が、 `ret` の要素の型 `Element` を受け取るようになっているため、 `Element` をデコードするように推論されます。この `Element` というのは、 `Array` にもともと定義されている 要素の型のパラメータ名です。
 
-さて、残念ながら `Array` を `Loadable` にできなかったので、 `load` からこれを呼び出す事ができません。しかたないので、 `loadArray` を定義します。
+さて、残念ながら `Array` を `Loadable` にできなかったので、 `load` からこれを呼び出す事ができません。そこで、同じ `load` メソッドを、返り値の型が違う `load` メソッドとしてオーバロードします。
 
 ```swift
 //	swift
 
-func loadArray<T: Loadable>(string: String) -> [T] {
+func load<T: Loadable>(string: String) -> [T] {
 	let tokens = string.components(separatedBy: "/")
 	let iterator = AnyIterator<String>(tokens.makeIterator())
-	return loadArray(iterator: iterator)
+	return load(iterator: iterator)
 }
 
-func loadArray<T: Loadable>(iterator: AnyIterator<String>) -> [T] {
+func load<T: Loadable>(iterator: AnyIterator<String>) -> [T] {
 	return Array<T>.load(iterator: iterator)
 }
 ```
 
-テストしてみます。
+もともとある `load` は 型 `T` が `Loadble` であるときに 返り値の型が `T` となる `load` メソッドですが、今回定義したのは 型 `T` が `Loadble` であるときに 返り値の型が `[T]` となる `load` メソッドです。既に述べた理由により、 `Array` が `Loadable` になることはありえないため、返り値が `Array` である場合 `T` を返す `load` がマッチすることはありません。そのため、この `[T]` を返す `load` が、 `T` を返す `load` と曖昧になることはありません。
+
+`Array` のデコードをテストしてみます。
 
 ```swift
 //	swift
 
-	let a: [String] = loadArray(string: "3/apple/banana/cherry")
+	let a: [String] = load(string: "3/apple/banana/cherry")
 	print(a)
 ```
 
@@ -265,12 +265,12 @@ extension Company: Loadable {
 	static func load(iterator: AnyIterator<String>) -> Company {
 		return Company(
 			name: Main.load(iterator: iterator),
-			employees: Main.loadArray(iterator: iterator))
+			employees: Main.load(iterator: iterator))
 	}
 }
 ```
 
-`Array.load` を実装した時と同じように、 `Main.load` がデコードする型のコンストラクタ引数のところに直接書かれているので、型推論器がコンストラクタ引数の型を参照してくれるおかげで、 `Main.load` についての型指定が不要になっています。 しかし、 `Array` 自体は `Loadable` になっていないため、 `employees:` のところは、 `load` ではなく `loadArray` を指定する必要があります。
+`Array.load` を実装した時と同じように、 `Main.load` がデコードする型のコンストラクタ引数のところに直接書かれているので、型推論器がコンストラクタ引数の型を参照してくれるおかげで、 `Main.load` についての型指定が不要になっています。 `employees:` のところは、引数の型として `[Employee]` が期待されているため、 `[T]` を返す方の `Main.load` がオーバーロードとして解決されます。
 
 テストしてみます。
 
@@ -351,11 +351,11 @@ func load<T: Loadable>(iterator: AnyIterator<String>) -> T
 	where T.Loaded == T 
 { ... }
 
-func loadArray<T: Loadable>(string: String) -> [T] 
+func load<T: Loadable>(string: String) -> [T] 
 	where T.Loaded == T 
 { ... }
 
-func loadArray<T: Loadable>(iterator: AnyIterator<String>) -> [T] 
+func load<T: Loadable>(iterator: AnyIterator<String>) -> [T] 
 	where T.Loaded == T 
 { ... }
 
@@ -427,7 +427,7 @@ fun <T> load(iterator: Iterator<String>): T {
 }
 ```
 
-しかしここで困ることになります。swiftの場合は制約をかけた `T` に対して `T.load` という形でstaticメソッド呼び出しを書くことができました。しかし今 `T` に対してstaticメソッドの制約を書くことはできません。肝心の `load` の実体は、 `LoadableStatic` インターフェースに定義されています。インターフェースのメソッドを呼び出すためには、そのインターフェースを満たすオブジェクトのインスタンスメソッドを呼ぶしかありません。 `T` に対応する `LoadableStatic<T>` のインスタンスがなんらかの方法で呼び出せれば良いですが、そのような機能もありません。そうすると結局のところ、 `LoadableStatic<T>` のインスタンスを引数として受け取るしかありません。よって下記のようになります。
+しかしここで困ることになります。swiftの場合は制約をかけた `T` に対して `T.load` という形でstaticメソッド呼び出しを書くことができました。しかし今 `T` に対してstaticメソッドの制約を書くことはできません。肝心の `load` の実体は、 `LoadableStatic` インターフェースに定義されています。インターフェースのメソッドを呼び出すためには、そのインターフェースを満たすオブジェクトのインスタンスメソッドを呼ぶしかありません。 `T` に対応する `LoadableStatic<T>` のインスタンスがなんらかの方法で呼び出せれば良いですが、そのような機能もありません(厳密にはあるんですがここでは無視します。詳細は注釈に書きました。[^1])。そうすると結局のところ、 `LoadableStatic<T>` のインスタンスを引数として受け取るしかありません。よって下記のようになります。
 
 ```kotlin
 //	kotlin
@@ -510,7 +510,7 @@ class ListLoadableStatic<T>(val elementStatic: LoadableStatic<T>) :
 	println(a)
 ```
 
-`load` の第2引数のところで、 `List<String>` を表現しているのがわかります。なお、この場合は swiftの場合と違って `load` 関数だけでよく、 `loadArray` の実装は不要です。 その代わりに、 `ListLoadableStatic` を書かねばならなくなっているわけです。
+`load` の第2引数のところで、 `List<String>` を表現しているのがわかります。なお、この場合は swiftの場合と違って `load` 関数は `T` を返すもの1つだけでよく、 `List<T>` を返す `load` の実装は不要です。その代わりに、 `ListLoadableStatic` を書かねばならなくなっているわけです。
 
 また、ここで自ずと先程の、要素の型がデコード可能である事の制約も満たされます。要素の型がデコード不可能である場合は、 `ListLoadableStatic` のコンストラクタに渡す `LoadableStatic` のインスタンスが存在しないからです。
 
@@ -1137,7 +1137,7 @@ object Main {
         println(a)
 ```
 
-このように推論させる事ができました。swiftの時はここが `loadArray` になってしまいましたが、scalaでは共通の `load` のままで、入れ子の型にも対応できています。
+このように推論させる事ができました。 `List[String]` という入れ子の型にも、特別な記述無しで対応できています。
 
 最後に、 `Employee` と `Company` を見ていきましょう。
 
@@ -1180,12 +1180,12 @@ extension Company: Loadable {
 	static func load(iterator: AnyIterator<String>) -> Company {
 		return Company(
 			name: Main.load(iterator: iterator),
-			employees: Main.loadArray(iterator: iterator))
+			employees: Main.load(iterator: iterator))
 	}
 }
 ```
 
-swiftの場合はこのように、型指定をしないで記述できています。 `loadArray` だけは記述していますが、この配列の要素の型である `Employee` については推論できています。これはswiftは返り値からの型推論が効くために型が省略できたのに対して、Scalaはそれができないために型を書かなければならないことによる違いです。
+swiftの場合はこのように、型指定をしないで記述できています。 これはswiftは返り値からの型推論が効くために型が省略できたのに対して、Scalaはそれができないために型を書かなければならないことによる違いです。
 
 scalaでの呼び出しは下記のようになります。
 
@@ -1206,7 +1206,7 @@ Scalaでは `LoadableStatic` の存在は見た目に隠蔽する事ができま
 
 - 初期化代入文では、Swiftでは左辺、Scalaでは右辺の型指定が必要 
 - 関数呼び出し部分ではSwiftは不要、Scalaでは型指定が必要
-- SwiftはArray用の `loadArray` の実装と呼び出しが必要、Scalaでは汎用の `load` で全て対応
+- SwiftはArray用の `load` の実装が必要、Scalaでは汎用の `load` で全て対応
 
 まず1つ目については、原理上左にせよ右にせよ、何かしら1箇所は指定が必要な場面です。どちらも無かったら何をデコードすれば良いか決められません。そして左と右は同じように思えます。しかし、これが初期化代入文ではなく、変数への再代入文だった場合を考えてみると、swiftは型指定を無くす事ができます。その点では左側指定の仕様の方が便利かもしれません。しかし、変数より定数を初期化代入する事のほうが一般に多いので、あまり変わらないでしょう。
 
@@ -1647,4 +1647,20 @@ C++の実装はこれまでのどれとも違う感じです。実質的に、C+
 # ソース
 
 [全てのソースをgithubにアップしてあります。](https://github.com/omochi/qiita-static-method)
+
+
+
+# 改訂履歴
+
+- 2017/03/01: [norio_nomuraさん](norio_nomura)のツッコミを受けて改訂。swiftにおいて、loadArrayを定義する例を、loadの返り値型オーバーロードに変更。
+- 2017/02/27: [heqateさん](http://qiita.com/heqate)のツッコミを受けて改訂。kotlinにおいて、具象化された型ごとのジェネリッククラスへのextensionメソッド実装による実装方式について追記。
+- 2017/02/24: 投稿
+
+
+
+
+[^1]: [heqateさんがコメント](http://qiita.com/omochimetaru/items/621f1ef62b9798ee5ff5#comment-30bb5ab570b0435c3768) で提示しているように、ジェネリッククラスのエクステンションを、具象化された型パラメータごとに実装する事ができます。しかし、 `create` + `load` のように固定の冗長なメソッド呼び出しが必要なインターフェースになってしまっており使いやすくない上、記事で言語をまたいで統一している設計とも合致しないため、ここではその実装方法を取り上げません。仮にここで使われている具象化の機能を使ってより簡潔な形や記事にそった形にしようとしても、残念ながらどうしてもこのような形になります。その理由は、 `inline` 展開に伴う言語機能上の制約が厳しいからです。例えば、ジェネリックな inline 関数の内部で `LoadableStatic` のインスタンスを作って、 `load` の第2引数に渡そうとしたり、第2引数に束縛したクロージャを戻そうとしたりしても、コンパイル時に汎用の `T` としての妥当性が要求されてエラーになります。
+
+
+
 
